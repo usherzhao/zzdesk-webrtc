@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebRTC远程桌面 - 调试版观看端</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #2196F3, #1976D2);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .config-section {
+            padding: 30px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .connection-input {
+            background: #e3f2fd;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        .connection-input h3 {
+            color: #1976d2;
+            margin-bottom: 15px;
+        }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            margin-bottom: 15px;
+        }
+
+        .input-group label {
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #333;
+        }
+
+        .input-group input {
+            padding: 12px 15px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        .input-group input:focus {
+            outline: none;
+            border-color: #2196F3;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-top: 20px;
+        }
+
+        .btn {
+            padding: 12px 25px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            min-width: 150px;
+        }
+
+        .btn-primary {
+            background: #2196F3;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #1976D2;
+        }
+
+        .btn-danger {
+            background: #f44336;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #d32f2f;
+        }
+
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .video-section {
+            padding: 30px;
+            text-align: center;
+        }
+
+        .remote-video-container {
+            background: #000;
+            border-radius: 10px;
+            overflow: hidden;
+            position: relative;
+            margin: 0 auto;
+            max-width: 100%;
+        }
+
+        #remoteVideo {
+            width: 100%;
+            height: 600px;
+            object-fit: contain;
+            display: none;
+        }
+
+        .placeholder {
+            width: 100%;
+            height: 400px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #666;
+            font-size: 1.2em;
+            background: #f5f5f5;
+            border-radius: 10px;
+        }
+
+        .debug-section {
+            padding: 30px;
+            background: #f8f9fa;
+        }
+
+        .debug-info {
+            background: #263238;
+            color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            height: 400px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+        }
+
+        .log-entry {
+            margin: 5px 0;
+            padding: 2px 0;
+        }
+
+        .log-entry.error {
+            color: #ff5252;
+        }
+
+        .log-entry.success {
+            color: #4caf50;
+        }
+
+        .log-entry.warning {
+            color: #ff9800;
+        }
+
+        .log-entry.debug {
+            color: #81c784;
+        }
+
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .status-card {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #2196F3;
+        }
+
+        .status-card.error {
+            border-left-color: #f44336;
+        }
+
+        .status-card.success {
+            border-left-color: #4CAF50;
+        }
+
+        .status-card h4 {
+            margin-bottom: 8px;
+            color: #333;
+        }
+
+        .status-value {
+            font-size: 1.2em;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔍 WebRTC远程桌面 - 调试版</h1>
+            <p>观看端 - 详细调试信息</p>
+        </div>
+
+        <div class="config-section">
+            <div class="connection-input">
+                <h3>🔗 连接配置</h3>
+                <div class="input-group">
+                    <label for="connectionId">连接ID</label>
+                    <input type="text" id="connectionId" placeholder="输入屏幕共享端提供的连接ID">
+                </div>
+                <div class="input-group">
+                    <label for="signalingServer">信令服务器</label>
+                    <input type="text" id="signalingServer" value="ws://localhost:8080">
+                </div>
+            </div>
+
+            <div class="button-group">
+                <button class="btn btn-primary" id="connectBtn" onclick="connectToRemote()">🔗 连接远程桌面</button>
+                <button class="btn btn-danger" id="disconnectBtn" onclick="disconnect()" disabled>❌ 断开连接</button>
+            </div>
+        </div>
+
+        <div class="video-section">
+            <div class="remote-video-container">
+                <video id="remoteVideo" autoplay></video>
+                <div id="placeholder" class="placeholder">
+                    <div>
+                        <p>📺 等待连接远程桌面...</p>
+                        <p style="margin-top: 10px; font-size: 0.9em; color: #999;">请输入连接ID并点击连接</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="debug-section">
+            <h3>🔍 调试信息</h3>
+            
+            <div class="status-grid">
+                <div class="status-card" id="signalingStatus">
+                    <h4>信令连接</h4>
+                    <div class="status-value" id="signalingValue">未连接</div>
+                </div>
+                <div class="status-card" id="peerStatus">
+                    <h4>WebRTC连接</h4>
+                    <div class="status-value" id="peerValue">未连接</div>
+                </div>
+                <div class="status-card" id="iceStatus">
+                    <h4>ICE状态</h4>
+                    <div class="status-value" id="iceValue">未开始</div>
+                </div>
+                <div class="status-card" id="streamStatus">
+                    <h4>视频流</h4>
+                    <div class="status-value" id="streamValue">无</div>
+                </div>
+            </div>
+
+            <div class="debug-info" id="debugLogs"></div>
+        </div>
+    </div>
+
+    <script>
+        let peerConnection = null;
+        let signalingSocket = null;
+        let isConnected = false;
+        let remoteStream = null;
+        let roomId = null;
+
+        function debugLog(message, type = 'info') {
+            const logs = document.getElementById('debugLogs');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logs.appendChild(entry);
+            logs.scrollTop = logs.scrollHeight;
+            
+            // 同时输出到控制台
+            console.log(`[${type.toUpperCase()}] ${message}`);
+        }
+
+        function updateStatus(component, value, type = 'info') {
+            const statusCard = document.getElementById(`${component}Status`);
+            const statusValue = document.getElementById(`${component}Value`);
+            
+            statusValue.textContent = value;
+            statusCard.className = `status-card ${type}`;
+        }
+
+        async function connectSignaling() {
+            const signalingUrl = document.getElementById('signalingServer').value;
+            
+            return new Promise((resolve, reject) => {
+                debugLog(`正在连接信令服务器: ${signalingUrl}`, 'info');
+                updateStatus('signaling', '连接中...', 'warning');
+                
+                signalingSocket = new WebSocket(signalingUrl);
+                
+                signalingSocket.onopen = () => {
+                    debugLog('信令服务器连接成功', 'success');
+                    updateStatus('signaling', '已连接', 'success');
+                    resolve();
+                };
+                
+                signalingSocket.onerror = (error) => {
+                    debugLog(`信令服务器连接失败: ${error}`, 'error');
+                    updateStatus('signaling', '连接失败', 'error');
+                    reject(error);
+                };
+                
+                signalingSocket.onmessage = (event) => {
+                    const message = JSON.parse(event.data);
+                    debugLog(`收到信令消息: ${JSON.stringify(message)}`, 'debug');
+                    handleSignalingMessage(message);
+                };
+                
+                signalingSocket.onclose = () => {
+                    debugLog('信令服务器连接已断开', 'warning');
+                    updateStatus('signaling', '已断开', 'error');
+                };
+            });
+        }
+
+        function handleSignalingMessage(message) {
+            switch (message.type) {
+                case 'connected':
+                    debugLog(`获得客户端ID: ${message.clientId}`, 'success');
+                    break;
+                    
+                case 'room-joined':
+                    debugLog(`已加入房间: ${message.roomId}`, 'success');
+                    break;
+                    
+                case 'answer':
+                    debugLog('收到连接应答', 'success');
+                    handleAnswer(message);
+                    break;
+                    
+                case 'ice-candidate':
+                    debugLog('收到ICE候选者', 'debug');
+                    handleIceCandidate(message);
+                    break;
+                    
+                case 'host-disconnected':
+                    debugLog('主机已断开连接', 'warning');
+                    disconnect();
+                    break;
+                    
+                case 'error':
+                    debugLog(`服务器错误: ${message.message}`, 'error');
+                    break;
+            }
+        }
+
+        async function handleAnswer(message) {
+            try {
+                debugLog('设置远程描述...', 'info');
+                await peerConnection.setRemoteDescription(new RTCSessionDescription(message.answer));
+                debugLog('远程描述设置成功', 'success');
+                updateStatus('peer', '协商中...', 'warning');
+            } catch (error) {
+                debugLog(`处理应答失败: ${error.message}`, 'error');
+                updateStatus('peer', '协商失败', 'error');
+            }
+        }
+
+        async function handleIceCandidate(message) {
+            if (peerConnection) {
+                try {
+                    await peerConnection.addIceCandidate(new RTCIceCandidate(message.candidate));
+                    debugLog(`添加ICE候选者成功: ${message.candidate.type}`, 'debug');
+                } catch (error) {
+                    debugLog(`添加ICE候选者失败: ${error.message}`, 'error');
+                }
+            }
+        }
+
+        async function connectToRemote() {
+            roomId = document.getElementById('connectionId').value.trim();
+            
+            if (!roomId) {
+                debugLog('请输入连接ID', 'error');
+                return;
+            }
+
+            try {
+                debugLog(`开始连接到房间: ${roomId}`, 'info');
+
+                // 连接信令服务器
+                await connectSignaling();
+
+                // 加入房间
+                debugLog('发送加入房间请求...', 'info');
+                signalingSocket.send(JSON.stringify({
+                    type: 'join-room',
+                    roomId: roomId
+                }));
+
+                // 创建RTCPeerConnection
+                debugLog('创建RTCPeerConnection...', 'info');
+                peerConnection = new RTCPeerConnection({
+                    iceServers: [
+                        { urls: 'stun:stun.l.google.com:19302' }
+                    ]
+                });
+
+                // 设置事件处理
+                setupPeerConnection();
+
+                // 创建offer并发送
+                debugLog('创建连接请求...', 'info');
+                const offer = await peerConnection.createOffer();
+                await peerConnection.setLocalDescription(offer);
+
+                debugLog('发送连接请求到服务器...', 'info');
+                signalingSocket.send(JSON.stringify({
+                    type: 'offer',
+                    offer: offer
+                }));
+
+                // 更新UI状态
+                document.getElementById('connectBtn').disabled = true;
+                document.getElementById('disconnectBtn').disabled = false;
+
+            } catch (error) {
+                debugLog(`连接失败: ${error.message}`, 'error');
+                updateStatus('peer', '连接失败', 'error');
+            }
+        }
+
+        function setupPeerConnection() {
+            // ICE候选者处理
+            peerConnection.onicecandidate = (event) => {
+                if (event.candidate) {
+                    debugLog(`发送ICE候选者: ${event.candidate.type}`, 'debug');
+                    signalingSocket.send(JSON.stringify({
+                        type: 'ice-candidate',
+                        candidate: event.candidate
+                    }));
+                } else {
+                    debugLog('ICE候选者收集完成', 'info');
+                }
+            };
+
+            // ICE收集状态
+            peerConnection.onicegatheringstatechange = () => {
+                debugLog(`ICE收集状态: ${peerConnection.iceGatheringState}`, 'debug');
+                updateStatus('ice', peerConnection.iceGatheringState, 
+                    peerConnection.iceGatheringState === 'complete' ? 'success' : 'warning');
+            };
+
+            // ICE连接状态
+            peerConnection.oniceconnectionstatechange = () => {
+                debugLog(`ICE连接状态: ${peerConnection.iceConnectionState}`, 'info');
+            };
+
+            // 连接状态监控
+            peerConnection.onconnectionstatechange = () => {
+                debugLog(`WebRTC连接状态: ${peerConnection.connectionState}`, 'info');
+                updateStatus('peer', peerConnection.connectionState, 
+                    peerConnection.connectionState === 'connected' ? 'success' : 
+                    peerConnection.connectionState === 'failed' ? 'error' : 'warning');
+                
+                if (peerConnection.connectionState === 'connected') {
+                    isConnected = true;
+                    debugLog('WebRTC连接建立成功！', 'success');
+                    // 通知主机观看者已连接
+                    signalingSocket.send(JSON.stringify({
+                        type: 'viewer-connected'
+                    }));
+                }
+            };
+
+            // 接收远程流
+            peerConnection.ontrack = (event) => {
+                debugLog(`收到远程流，轨道数: ${event.streams[0].getTracks().length}`, 'success');
+                remoteStream = event.streams[0];
+                
+                const remoteVideo = document.getElementById('remoteVideo');
+                const placeholder = document.getElementById('placeholder');
+                
+                remoteVideo.srcObject = remoteStream;
+                remoteVideo.style.display = 'block';
+                placeholder.style.display = 'none';
+                
+                updateStatus('stream', '已接收', 'success');
+                debugLog('视频流显示成功！', 'success');
+
+                // 监听流状态
+                remoteStream.getTracks().forEach(track => {
+                    debugLog(`轨道类型: ${track.kind}, 状态: ${track.readyState}`, 'debug');
+                    
+                    track.onended = () => {
+                        debugLog(`${track.kind}轨道已结束`, 'warning');
+                    };
+                });
+            };
+        }
+
+        function disconnect() {
+            debugLog('开始断开连接...', 'info');
+            
+            if (peerConnection) {
+                peerConnection.close();
+                peerConnection = null;
+                updateStatus('peer', '已断开', 'error');
+            }
+
+            if (signalingSocket) {
+                signalingSocket.close();
+                signalingSocket = null;
+                updateStatus('signaling', '已断开', 'error');
+            }
+
+            if (remoteStream) {
+                remoteStream.getTracks().forEach(track => track.stop());
+                remoteStream = null;
+                updateStatus('stream', '无', 'error');
+            }
+
+            const remoteVideo = document.getElementById('remoteVideo');
+            const placeholder = document.getElementById('placeholder');
+            
+            remoteVideo.srcObject = null;
+            remoteVideo.style.display = 'none';
+            placeholder.style.display = 'flex';
+
+            document.getElementById('connectBtn').disabled = false;
+            document.getElementById('disconnectBtn').disabled = true;
+            
+            updateStatus('ice', '未开始', 'error');
+            isConnected = false;
+            roomId = null;
+
+            debugLog('连接已完全断开', 'warning');
+        }
+
+        // 页面卸载时清理资源
+        window.addEventListener('beforeunload', () => {
+            if (isConnected) {
+                disconnect();
+            }
+        });
+
+        // 初始化
+        debugLog('调试版观看端已就绪', 'success');
+        debugLog('请输入连接ID并点击连接按钮', 'info');
+    </script>
+</body>
+</html>

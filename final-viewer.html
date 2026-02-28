@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebRTC远程桌面 - 最终版观看端</title>
+    <script src="config-manager.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #2196F3, #1976D2);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .config-section {
+            padding: 30px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .connection-input {
+            background: #e3f2fd;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        .connection-input h3 {
+            color: #1976d2;
+            margin-bottom: 15px;
+        }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            margin-bottom: 15px;
+        }
+
+        .input-group label {
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #333;
+        }
+
+        .input-group input {
+            padding: 12px 15px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        .input-group input:focus {
+            outline: none;
+            border-color: #2196F3;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-top: 20px;
+        }
+
+        .btn {
+            padding: 12px 25px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            min-width: 150px;
+        }
+
+        .btn-primary {
+            background: #2196F3;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #1976D2;
+        }
+
+        .btn-danger {
+            background: #f44336;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #d32f2f;
+        }
+
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .video-section {
+            padding: 30px;
+            text-align: center;
+        }
+
+        .remote-video-container {
+            background: #000;
+            border-radius: 10px;
+            overflow: hidden;
+            position: relative;
+            margin: 0 auto;
+            max-width: 100%;
+        }
+
+        #remoteVideo {
+            width: 100%;
+            height: 600px;
+            object-fit: contain;
+            display: none;
+        }
+
+        .placeholder {
+            width: 100%;
+            height: 400px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #666;
+            font-size: 1.2em;
+            background: #f5f5f5;
+            border-radius: 10px;
+        }
+
+        .debug-section {
+            padding: 30px;
+            background: #f8f9fa;
+        }
+
+        .debug-info {
+            background: #263238;
+            color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            height: 300px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+        }
+
+        .log-entry {
+            margin: 5px 0;
+            padding: 2px 0;
+        }
+
+        .log-entry.error {
+            color: #ff5252;
+        }
+
+        .log-entry.success {
+            color: #4caf50;
+        }
+
+        .log-entry.warning {
+            color: #ff9800;
+        }
+
+        .log-entry.debug {
+            color: #81c784;
+        }
+
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .status-card {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #2196F3;
+        }
+
+        .status-card.error {
+            border-left-color: #f44336;
+        }
+
+        .status-card.success {
+            border-left-color: #4CAF50;
+        }
+
+        .status-card.warning {
+            border-left-color: #ff9800;
+        }
+
+        .status-card h4 {
+            margin-bottom: 8px;
+            color: #333;
+            font-size: 0.9em;
+        }
+
+        .status-value {
+            font-size: 1.1em;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎯 WebRTC远程桌面 - 最终版</h1>
+            <p>观看端 - 智能顺序回退连接 & 状态监测</p>
+        </div>
+
+        <div class="config-section">
+            <div class="connection-input">
+                <h3>🔗 连接配置</h3>
+                <div class="input-group">
+                    <label for="connectionId">连接ID</label>
+                    <input type="text" id="connectionId" placeholder="输入屏幕共享端提供的连接ID">
+                </div>
+                <div class="input-group">
+                    <label for="signalingServer">信令服务器</label>
+                    <input type="text" id="signalingServer" value="ws://localhost:8080">
+                </div>
+            </div>
+
+            <div class="button-group">
+                <button class="btn btn-primary" id="connectBtn" onclick="connectToRemote()">🔗 连接远程桌面</button>
+                <button class="btn btn-danger" id="disconnectBtn" onclick="disconnect()" disabled>❌ 断开连接</button>
+            </div>
+        </div>
+
+        <div class="video-section">
+            <div class="remote-video-container">
+                <video id="remoteVideo" autoplay playsinline muted></video>
+                <div id="placeholder" class="placeholder">
+                    <div>
+                        <p>📺 等待连接远程桌面...</p>
+                        <p style="margin-top: 10px; font-size: 0.9em; color: #999;">请输入连接ID并点击连接</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="debug-section">
+            <h3>🔍 连接状态</h3>
+            
+            <div class="status-grid">
+                <div class="status-card" id="signalingStatus">
+                    <h4>信令连接</h4>
+                    <div class="status-value" id="signalingValue">未连接</div>
+                </div>
+                <div class="status-card" id="peerStatus">
+                    <h4>WebRTC连接</h4>
+                    <div class="status-value" id="peerValue">未连接</div>
+                </div>
+                <div class="status-card" id="modeStatus">
+                    <h4>连接模式</h4>
+                    <div class="status-value" id="modeValue">未探测</div>
+                </div>
+                <div class="status-card" id="iceStatus">
+                    <h4>ICE状态</h4>
+                    <div class="status-value" id="iceValue">未开始</div>
+                </div>
+                <div class="status-card" id="streamStatus">
+                    <h4>视频流</h4>
+                    <div class="status-value" id="streamValue">无</div>
+                </div>
+            </div>
+
+            <div class="debug-info" id="debugLogs"></div>
+        </div>
+    </div>
+
+    <script>
+        let peerConnection = null;
+        let signalingSocket = null;
+        let isConnected = false;
+        let isAttempting = false;
+        let remoteStream = null;
+        let roomId = null;
+        let pendingIceCandidates = [];
+
+        // 阶梯式回退连接策略相关
+        const connectionModes = ['host', 'nat', 'relay'];
+        let currentModeIndex = 0;
+        let connectionTimeoutId = null;
+
+        function debugLog(message, type = 'info') {
+            const logs = document.getElementById('debugLogs');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logs.appendChild(entry);
+            logs.scrollTop = logs.scrollHeight;
+            
+            console.log(`[${type.toUpperCase()}] ${message}`);
+        }
+
+        function updateStatus(component, value, type = 'info') {
+            const statusCard = document.getElementById(`${component}Status`);
+            const statusValue = document.getElementById(`${component}Value`);
+            
+            if (statusValue && statusCard) {
+                statusValue.textContent = value;
+                statusCard.className = `status-card ${type}`;
+            }
+        }
+
+        // 获取并判断最终生效的 WebRTC 连接模式
+        async function checkConnectionType(pc) {
+            try {
+                const stats = await pc.getStats();
+                let localCandidateType = '';
+                let remoteCandidateType = '';
+
+                stats.forEach(report => {
+                    if (report.type === 'candidate-pair' && report.nominated) {
+                        const localCandidate = stats.get(report.localCandidateId);
+                        const remoteCandidate = stats.get(report.remoteCandidateId);
+                        if (localCandidate) localCandidateType = localCandidate.candidateType;
+                        if (remoteCandidate) remoteCandidateType = remoteCandidate.candidateType;
+                    }
+                });
+
+                let connectionMode = '未知';
+                if (localCandidateType === 'relay' || remoteCandidateType === 'relay') {
+                    connectionMode = '🌐 TURN中继';
+                } else if (localCandidateType === 'srflx' || remoteCandidateType === 'srflx' || localCandidateType === 'prflx' || remoteCandidateType === 'prflx') {
+                    connectionMode = '⚡ NAT直连';
+                } else if (localCandidateType === 'host' && remoteCandidateType === 'host') {
+                    connectionMode = '🏠 局域网';
+                }
+
+                if (connectionMode !== '未知') {
+                    debugLog(`✅ 当前确立的连接模式: ${connectionMode}`, 'success');
+                    updateStatus('mode', connectionMode, 'success');
+                }
+            } catch (err) {
+                debugLog(`获取连接模式详情失败: ${err.message}`, 'error');
+            }
+        }
+
+        // 针对不同连接模式生成专属的配置
+        function getRTCConfigForMode(mode) {
+            let baseConfig = {
+                iceServers: [
+                    { urls: 'stun:stun.l.google.com:19302' },
+                    { urls: 'stun:stun1.l.google.com:19302' }
+                ],
+                iceCandidatePoolSize: 10
+            };
+            
+            if (window.configManager && window.configManager.config) {
+                baseConfig = window.configManager.getWebRTCConfig();
+            }
+
+            const config = { ...baseConfig };
+
+            if (mode === 'host') {
+                // Host模式：清空服务器，强制只能使用局域网IP探测
+                config.iceServers = [];
+            } else if (mode === 'nat') {
+                // NAT模式：保留基础配置，但不强制使用relay（通过代码过滤relay candidates）
+                delete config.iceTransportPolicy;
+            } else if (mode === 'relay') {
+                // Relay模式：强制策略为中继
+                config.iceTransportPolicy = 'relay';
+            }
+
+            return config;
+        }
+
+        async function connectSignaling() {
+            let signalingUrl = document.getElementById('signalingServer').value;
+            if (window.configManager && window.configManager.config) {
+                signalingUrl = window.configManager.get('signaling.url') || signalingUrl;
+            }
+            
+            return new Promise((resolve, reject) => {
+                debugLog(`🔌 连接信令服务器: ${signalingUrl}`, 'info');
+                updateStatus('signaling', '连接中...', 'warning');
+                
+                signalingSocket = new WebSocket(signalingUrl);
+                
+                signalingSocket.onopen = () => {
+                    debugLog('✅ 信令服务器连接成功', 'success');
+                    updateStatus('signaling', '已连接', 'success');
+                    resolve();
+                };
+                
+                signalingSocket.onerror = (error) => {
+                    debugLog(`❌ 信令连接失败`, 'error');
+                    updateStatus('signaling', '连接失败', 'error');
+                    reject(error);
+                };
+                
+                signalingSocket.onmessage = (event) => {
+                    try {
+                        const message = JSON.parse(event.data);
+                        handleSignalingMessage(message);
+                    } catch (e) {
+                        debugLog(`❌ 信令消息解析失败: ${e.message}`, 'error');
+                    }
+                };
+                
+                signalingSocket.onclose = () => {
+                    debugLog('⚠️ 信令服务器连接断开', 'warning');
+                    updateStatus('signaling', '已断开', 'error');
+                };
+            });
+        }
+
+        function handleSignalingMessage(message) {
+            debugLog(`📨 收到信令: ${message.type}`, 'debug');
+            
+            switch (message.type) {
+                case 'connected':
+                    debugLog(`🆔 客户端ID: ${message.clientId}`, 'success');
+                    break;
+                    
+                case 'room-joined':
+                    debugLog(`🏠 已加入房间: ${message.roomId}`, 'success');
+                    // 加入房间后启动多阶段连接尝试
+                    startWebRTCAttempt(0);
+                    break;
+                    
+                case 'answer':
+                    debugLog('📥 收到连接应答', 'success');
+                    handleAnswer(message);
+                    break;
+                    
+                case 'ice-candidate':
+                    debugLog(`🧊 收到ICE候选者`, 'debug');
+                    handleIceCandidate(message);
+                    break;
+                    
+                case 'host-disconnected':
+                    debugLog('⚠️ 主机已断开', 'warning');
+                    disconnect();
+                    break;
+                    
+                case 'error':
+                    debugLog(`❌ 服务器错误: ${message.message}`, 'error');
+                    break;
+            }
+        }
+
+        async function handleAnswer(message) {
+            if (!peerConnection || !isAttempting) return;
+            
+            try {
+                debugLog('🔄 设置远程描述...', 'info');
+                await peerConnection.setRemoteDescription(new RTCSessionDescription(message.answer));
+                debugLog('✅ 远程描述设置成功', 'success');
+                
+                // 处理暂存的ICE候选者
+                debugLog(`📦 处理暂存的ICE候选者: ${pendingIceCandidates.length}个`, 'info');
+                for (const candidate of pendingIceCandidates) {
+                    try {
+                        await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+                    } catch (error) {
+                        debugLog(`❌ 暂存ICE候选者添加失败: ${error.message}`, 'error');
+                    }
+                }
+                pendingIceCandidates = [];
+                
+            } catch (error) {
+                debugLog(`❌ 处理应答失败: ${error.message}`, 'error');
+                handleConnectionFailure('协商失败 (描述设置错误)');
+            }
+        }
+
+        async function handleIceCandidate(message) {
+            if (!peerConnection || !isAttempting) return;
+
+            try {
+                if (!message.candidate) {
+                    await peerConnection.addIceCandidate(message.candidate);
+                    return;
+                }
+
+                const mode = connectionModes[currentModeIndex];
+                const candidateStr = message.candidate.candidate || '';
+                
+                // 严格按照当前模式过滤远端传来的候选者
+                if (mode === 'host' && !candidateStr.includes('typ host')) return; 
+                if (mode === 'nat' && candidateStr.includes('typ relay')) return;
+
+                if (peerConnection.remoteDescription) {
+                    await peerConnection.addIceCandidate(new RTCIceCandidate(message.candidate));
+                    debugLog(`✅ 成功添加匹配模式的ICE候选者`, 'debug');
+                } else {
+                    pendingIceCandidates.push(message.candidate);
+                }
+            } catch (error) {
+                debugLog(`❌ ICE候选者处理报错: ${error.message}`, 'error');
+            }
+        }
+
+        async function connectToRemote() {
+            if (isAttempting || isConnected) return;
+
+            roomId = document.getElementById('connectionId').value.trim();
+            if (!roomId) {
+                debugLog('❌ 请输入连接ID', 'error');
+                return;
+            }
+
+            try {
+                isAttempting = true;
+                document.getElementById('connectBtn').disabled = true;
+                document.getElementById('disconnectBtn').disabled = false;
+                
+                updateStatus('mode', '准备中...', 'warning');
+
+                debugLog(`🚀 开始连接房间: ${roomId}`, 'info');
+
+                // 确保信令系统连接
+                if (!signalingSocket || signalingSocket.readyState !== WebSocket.OPEN) {
+                    await connectSignaling();
+                    signalingSocket.send(JSON.stringify({
+                        type: 'join-room',
+                        roomId: roomId
+                    }));
+                } else {
+                    startWebRTCAttempt(0);
+                }
+
+            } catch (error) {
+                debugLog(`❌ 连接准备失败: ${error.message}`, 'error');
+                disconnect();
+            }
+        }
+
+        // 核心函数：根据指定索引启动特定模式的 WebRTC 连接
+        async function startWebRTCAttempt(modeIndex) {
+            currentModeIndex = modeIndex;
+            const mode = connectionModes[currentModeIndex];
+            pendingIceCandidates = []; // 清空上一个模式遗留的候选者
+            
+            debugLog(`[策略分配] 尝试使用 ${mode.toUpperCase()} 模式进行连接...`, 'info');
+            updateStatus('mode', `尝试 ${mode.toUpperCase()}...`, 'warning');
+            updateStatus('peer', '创建中...', 'warning');
+
+            // 清理旧连接
+            if (peerConnection) {
+                peerConnection.onconnectionstatechange = null;
+                peerConnection.onicecandidate = null;
+                peerConnection.close();
+                peerConnection = null;
+            }
+
+            try {
+                const configuration = getRTCConfigForMode(mode);
+                peerConnection = new RTCPeerConnection(configuration);
+                setupPeerConnection();
+
+                setTimeout(async () => {
+                    if (!isAttempting) return;
+                    try {
+                        debugLog(`📤 [${mode.toUpperCase()}] 创建连接请求...`, 'info');
+                        const offer = await peerConnection.createOffer({
+                            offerToReceiveVideo: true,
+                            offerToReceiveAudio: true
+                        });
+                        
+                        await peerConnection.setLocalDescription(offer);
+                        
+                        signalingSocket.send(JSON.stringify({
+                            type: 'offer',
+                            offer: offer
+                        }));
+                        
+                        updateStatus('peer', '协商中...', 'warning');
+                    } catch (error) {
+                        handleConnectionFailure(`创建offer失败: ${error.message}`);
+                    }
+                }, 1000);
+
+                // 设置 8秒 超时强制判断
+                clearTimeout(connectionTimeoutId);
+                connectionTimeoutId = setTimeout(() => {
+                    if (peerConnection && peerConnection.connectionState !== 'connected' && isAttempting) {
+                        handleConnectionFailure(`[${mode.toUpperCase()}] 模式尝试超时`);
+                    }
+                }, 8000);
+
+            } catch (error) {
+                handleConnectionFailure(`[${mode.toUpperCase()}] 模式启动异常: ${error.message}`);
+            }
+        }
+
+        // 模式降级处理
+        function handleConnectionFailure(reason) {
+            if (!isAttempting) return;
+
+            debugLog(`❌ ${reason}`, 'warning');
+            clearTimeout(connectionTimeoutId);
+            
+            if (currentModeIndex < connectionModes.length - 1) {
+                const nextMode = connectionModes[currentModeIndex + 1];
+                debugLog(`👉 准备降级跳过，切换至下一种模式: ${nextMode.toUpperCase()}`, 'warning');
+                startWebRTCAttempt(currentModeIndex + 1);
+            } else {
+                debugLog('❌ 最终失败：所有策略网络探测均不通。请检查网络防火墙或配置。', 'error');
+                updateStatus('peer', '彻底失败', 'error');
+                updateStatus('mode', '无法连接', 'error');
+                disconnect(); 
+            }
+        }
+
+        function setupPeerConnection() {
+            peerConnection.onicecandidate = (event) => {
+                if (event.candidate && isAttempting) {
+                    debugLog(`📤 发送ICE候选者: ${event.candidate.type}`, 'debug');
+                    signalingSocket.send(JSON.stringify({
+                        type: 'ice-candidate',
+                        candidate: event.candidate
+                    }));
+                }
+            };
+
+            peerConnection.onicegatheringstatechange = () => {
+                const state = peerConnection.iceGatheringState;
+                updateStatus('ice', state, state === 'complete' ? 'success' : 'warning');
+            };
+
+            peerConnection.onconnectionstatechange = () => {
+                const state = peerConnection.connectionState;
+                const modeStr = connectionModes[currentModeIndex].toUpperCase();
+                
+                debugLog(`🌐 [${modeStr}] WebRTC底层状态: ${state}`, 'info');
+                
+                if (state === 'connected' && isAttempting) {
+                    clearTimeout(connectionTimeoutId);
+                    isConnected = true;
+                    isAttempting = false; 
+                    
+                    updateStatus('peer', '已连接', 'success');
+                    debugLog('🎉 WebRTC连接建立成功！', 'success');
+                    
+                    signalingSocket.send(JSON.stringify({ type: 'viewer-connected' }));
+                    
+                    // 延迟获取最终连接模式
+                    setTimeout(() => { checkConnectionType(peerConnection); }, 1000);
+                    
+                } else if ((state === 'failed' || state === 'disconnected') && isAttempting) {
+                    handleConnectionFailure(`[${modeStr}] 底层探测失败 (ICE Failed)`);
+                } else if (state === 'failed' || state === 'disconnected') {
+                    updateStatus('peer', '已断开', 'error');
+                }
+            };
+
+            peerConnection.ontrack = (event) => {
+                debugLog(`📺 收到远程流，准备播放`, 'success');
+                remoteStream = event.streams[0];
+                
+                const remoteVideo = document.getElementById('remoteVideo');
+                const placeholder = document.getElementById('placeholder');
+                
+                remoteVideo.srcObject = remoteStream;
+                
+                remoteVideo.oncanplay = () => {
+                    debugLog('▶️ 视频可以播放', 'success');
+                    remoteVideo.style.display = 'block';
+                    placeholder.style.display = 'none';
+                    updateStatus('stream', '正在播放', 'success');
+                    remoteVideo.muted = false; // 尝试开启声音
+                };
+            };
+        }
+
+        function disconnect() {
+            debugLog('🔌 开始断开连接...', 'info');
+            
+            isAttempting = false;
+            isConnected = false;
+            roomId = null;
+            pendingIceCandidates = [];
+            clearTimeout(connectionTimeoutId);
+
+            if (peerConnection) {
+                peerConnection.close();
+                peerConnection = null;
+                updateStatus('peer', '已断开', 'error');
+            }
+
+            if (signalingSocket) {
+                signalingSocket.close();
+                signalingSocket = null;
+                updateStatus('signaling', '已断开', 'error');
+            }
+
+            if (remoteStream) {
+                remoteStream.getTracks().forEach(track => track.stop());
+                remoteStream = null;
+                updateStatus('stream', '无', 'error');
+            }
+
+            const remoteVideo = document.getElementById('remoteVideo');
+            const placeholder = document.getElementById('placeholder');
+            
+            remoteVideo.srcObject = null;
+            remoteVideo.style.display = 'none';
+            placeholder.style.display = 'flex';
+
+            document.getElementById('connectBtn').disabled = false;
+            document.getElementById('disconnectBtn').disabled = true;
+            
+            updateStatus('ice', '未开始', 'error');
+            updateStatus('mode', '未探测', 'error');
+
+            debugLog('✅ 连接已完全断开', 'warning');
+        }
+
+        window.addEventListener('beforeunload', () => {
+            disconnect();
+        });
+
+        debugLog('🚀 最终版观看端已就绪 (智能顺序探测机制开启)', 'success');
+        debugLog('💡 请输入连接ID并点击连接按钮', 'info');
+    </script>
+</body>
+</html>

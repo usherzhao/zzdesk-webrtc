@@ -1,0 +1,27 @@
+{
+  "name": "webrtc-coturn-remote-desktop",
+  "version": "1.0.0",
+  "description": "WebRTC + COTURN 远程桌面系统",
+  "main": "signaling-server.js",
+  "scripts": {
+    "start": "node signaling-server.js",
+    "dev": "node signaling-server.js",
+    "test": "echo \"请使用浏览器打开 http://localhost:8080/coturn-test.html 测试COTURN服务器\"",
+    "install-deps": "npm install ws"
+  },
+  "keywords": [
+    "webrtc",
+    "coturn",
+    "remote-desktop",
+    "screen-sharing",
+    "websocket"
+  ],
+  "author": "CodeBuddy",
+  "license": "MIT",
+  "dependencies": {
+    "ws": "^8.18.3"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}
