@@ -28,12 +28,12 @@ deploy.bat
 
 ### 方法二：手动部署
 
-1. **安装依赖**
+#### 1. **安装依赖**
 ```bash
 npm install
 ```
 
-2. **启动信令服务器**
+#### 2. **启动信令服务器**
 ```bash
 # 默认端口8080
 node signaling-server.js
@@ -44,8 +44,9 @@ node signaling-server.js 3000
 # 使用环境变量
 PORT=3000 node signaling-server.js
 ```
-
-3. **访问系统**
+##### 2.1.***通过cloudflare部署信令服务器***
+- https://github.com/usherzhao/webrtc-signaling-worker
+#### 3. **访问系统**
 - 打开浏览器访问 `http://localhost:8080`（或您自定义的端口）
 
 ## 📁 文件结构
